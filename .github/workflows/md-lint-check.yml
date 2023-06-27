@@ -7,8 +7,8 @@ on:
         required: false
         type: string
     secrets:
-      GITHUB_TOKEN:
-        required: true
+      token:
+        required: false
 
 jobs:
   lint:
