@@ -13,7 +13,7 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
+  
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -30,4 +30,9 @@ jobs:
     - name: Install dependencies
       run: npm install -g markdownlint-cli
     - name: Run linter
-      run: markdownlint . --config .github/configs/.markdownlint.json --ignore node_modules --ignore .github
+      run: markdownlint . --config .github/configs/.markdownlint.json --ignore node_modules --ignore .github &> lint.txt
+    - name: Show Linting Issues
+      if: failure()
+      run: |
+        cat lint.txt
+        sed -i 's/```/triple-backtick/g' lint.txt
