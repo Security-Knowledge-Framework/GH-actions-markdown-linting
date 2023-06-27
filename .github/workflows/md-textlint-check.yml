@@ -20,11 +20,17 @@ jobs:
   textlint:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
+    - name: Checkout caller repository
       uses: actions/checkout@v3
       with:
         ref: ${{inputs.ref}}
         repository: ${{inputs.repository}}
+        path: 'repo'
+    - name: Checkout workflow repository
+      uses: actions/checkout@v3
+      with:
+        repository: 'Security-Knowledge-Framework/GH-actions-markdown-linting' # The repository hosting the reusable workflow
+        path: 'workflow-repo'
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
@@ -38,7 +44,7 @@ jobs:
         touch log.txt
         # All markdown files, excluding .github
         # Use fix flag so that it goes through all files
-        for FILE in $(find . -name '*.md' ! -path './.github/*'); do echo $FILE && textlint --config .github/configs/.textlintrc --fix --rule terminology $FILE | tee -a log.txt; done
+        for FILE in $(find ./repo -name '*.md' ! -path './repo/.github/*'); do echo $FILE && textlint --config ./workflow-repo/.github/configs/.textlintrc --fix --rule terminology $FILE | tee -a log.txt; done
         if grep -q  'Incorrect usage' log.txt ; then exit 1 ; else echo -e \"No terminology issues found.\"; fi
     - name: Show Mistakes
       if: failure()
