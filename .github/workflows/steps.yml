@@ -20,6 +20,10 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+    - name: Print input values
+      run: |
+        echo "Ref: ${{inputs.ref}}"
+        echo "Repository: ${{inputs.repository}}"
     - name: Checkout caller repository
       uses: actions/checkout@v3
       with:
