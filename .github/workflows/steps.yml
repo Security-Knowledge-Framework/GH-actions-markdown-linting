@@ -17,64 +17,62 @@ on:
         required: true
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Print input values
-      run: |
-        echo "Ref: ${{inputs.ref}}"
-        echo "Repository: ${{inputs.repository}}"
-    - name: Checkout caller repository
-      uses: actions/checkout@v3
-      with:
-        ref: ${{inputs.ref}}
-        repository: ${{inputs.repository}}
-        path: 'repo'
+- name: Create check run
+  id: create_check
+  uses: actions/github-script@v6
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    result-encoding: string
+    script: |
+      const result = await github.rest.checks.create({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        name: 'Linting',
+        head_sha: context.sha,
+        status: 'in_progress',
+        started_at: new Date()
+      });
+      return result.data.id;
 
-    - name: Checkout workflow repository
-      uses: actions/checkout@v3
-      with:
-        repository: 'Security-Knowledge-Framework/GH-actions-markdown-linting' # The repository hosting the reusable workflow
-        path: 'workflow-repo'
+- name: Run linter
+  run: |
+    npm install -g markdownlint-cli
+    markdownlint ./repo --config ./workflow-repo/.github/configs/.markdownlint.json --ignore node_modules --ignore .github &> lint.txt
+  continue-on-error: true
+  working-directory: ${{github.workspace}}
 
-    - name: Setup Node
-      uses: actions/setup-node@v3
-      with:
-        node-version: '16'
+- name: Update check run
+  if: always()
+  uses: actions/github-script@v6
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    script: |
+      const fs = require("fs");
+      const lintPath = `${process.env.GITHUB_WORKSPACE}/lint.txt`;
+      const lintString = fs.readFileSync(lintPath).toString().trimEnd();
 
-    - name: Install dependencies
-      run: npm install -g markdownlint-cli
+      let conclusion = 'success';
+      let output = {
+        title: 'Linting Results',
+        summary: 'No issues found.'
+      };
 
-    - name: Run linter
-      run: markdownlint ./repo --config ./workflow-repo/.github/configs/.markdownlint.json --ignore node_modules --ignore .github &> lint.txt
-      working-directory: ${{github.workspace}}
-          
-    - name: Show Linting Issues
-      if: failure()
-      run: |
-        cat lint.txt
-        sed -i 's/```/triple-backtick/g' lint.txt
-  
-    - name: Attach Linting Issues
-      if: failure()
-      uses: actions/upload-artifact@v3
-      with:
-        name: Linting Issues
-        path: lint.txt
-    
-    - name: Comment Linting Issues
-      if: failure()
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{secrets.token}}
-        script: |
-          const fs = require("fs");
-          const lintPath = `${process.env.GITHUB_WORKSPACE}/lint.txt`;
-          const lintString = fs.readFileSync(lintPath).toString().trimEnd();
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `**The following issues were identified:** \n${lintString}`
-          })
+      if (lintString) {
+        conclusion = 'failure';
+        output = {
+          title: 'Linting Results',
+          summary: 'Issues found.',
+          text: lintString
+        };
+      }
+
+      await github.rest.checks.update({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        check_run_id: ${{ steps.create_check.outputs.result }},
+        status: 'completed',
+        conclusion: conclusion,
+        completed_at: new Date(),
+        output: output
+      });
     
