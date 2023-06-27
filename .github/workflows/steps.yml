@@ -3,10 +3,6 @@ name: Markdown Lint Check
 on:
   workflow_call:
     inputs:
-      config-path:
-        description: 'Path to the configuration file'
-        required: false
-        type: string
       ref:
         description: 'Branch or tag ref to checkout'
         required: true
@@ -24,42 +20,29 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
+    - name: Checkout caller repository
       uses: actions/checkout@v3
       with:
         ref: ${{inputs.ref}}
         repository: ${{inputs.repository}}
+        path: 'repo'
+
+    - name: Checkout workflow repository
+      uses: actions/checkout@v3
+      with:
+        repository: 'Security-Knowledge-Framework/GH-actions-markdown-linting' # The repository hosting the reusable workflow
+        path: 'workflow-repo'
+
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
         node-version: '16'
+
     - name: Install dependencies
       run: npm install -g markdownlint-cli
+
     - name: Run linter
-      run: markdownlint . --config ${{inputs.config-path}} --ignore node_modules --ignore .github &> lint.txt
-    - name: Show Linting Issues
-      if: failure()
-      run: |
-        cat lint.txt
-        sed -i 's/```/triple-backtick/g' lint.txt
-    - name: Attach Linting Issues
-      if: failure()
-      uses: actions/upload-artifact@v3
-      with:
-        name: Linting Issues
-        path: lint.txt
-    - name: Comment Linting Issues
-      if: failure()
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{secrets.token}}
-        script: |
-          const fs = require("fs");
-          const lintPath = `${process.env.GITHUB_WORKSPACE}/lint.txt`;
-          const lintString = fs.readFileSync(lintPath).toString().trimEnd();
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `**The following issues were identified:** \n${lintString}`
-          })
+      run: markdownlint ./repo --config ./workflow-repo/.github/configs/.markdownlint.json --ignore node_modules --ignore .github &> lint.txt
+      working-directory: ${{github.workspace}}
+      
+    # ... rest of your steps
