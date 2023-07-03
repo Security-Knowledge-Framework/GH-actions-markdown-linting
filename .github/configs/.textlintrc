@@ -195,11 +195,6 @@
 					"black[- ]?list(?:ed|ing)?",
 					"deny list(s), or re-write as applicable"
 				],
-				[
-					"white[- ]?list(?:ed|ing)?",
-					"allow list(s), or re-write as applicable"
-				],
-
 				// Single word
 				[
 					"auto[- ]complete",
